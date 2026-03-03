@@ -1,0 +1,12 @@
+name = "arbor-docusign-proxy"
+main = "src/worker.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = "npm install && npx tsc --noEmit"
+
+# Optional: restrict to specific routes
+# routes = [
+#   { pattern = "yourworker.yourdomain.com/docusign/*", zone_name = "yourdomain.com" }
+# ]
