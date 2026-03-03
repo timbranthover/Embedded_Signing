@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Document Signing — Arbor Wealth</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #F5F2EC;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: #1C2028;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #E6E1D6;
+      border-radius: 16px;
+      padding: 40px 48px;
+      text-align: center;
+      max-width: 420px;
+      width: 90vw;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    }
+    .icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .icon-success { background: #D8F3DC; }
+    .icon-cancel  { background: #F5F2EC; }
+    .icon-decline { background: #FDE8EB; }
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+    p  { font-size: 13px; color: #6B7280; line-height: 1.5; }
+    .closing { margin-top: 16px; font-size: 12px; color: #9CA3AF; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="icon icon-success" id="icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <h1 id="title">Processing…</h1>
+    <p id="message">Please wait.</p>
+    <p class="closing">You may close this window at any time.</p>
+  </div>
+
+  <script>
+    (function () {
+      // Parse DocuSign return event from query string
+      // DocuSign appends ?event=signing_complete (or cancel, decline, etc.)
+      var params   = new URLSearchParams(window.location.search);
+      var dsEvent  = params.get('event') || 'cancel';
+
+      var messages = {
+        signing_complete: {
+          title:   'Document Signed',
+          message: 'Your signature has been recorded. Thank you.',
+          iconClass: 'icon-success',
+          iconSvg: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+        },
+        cancel: {
+          title:   'Signing Cancelled',
+          message: 'You can return to sign the document at any time.',
+          iconClass: 'icon-cancel',
+          iconSvg: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+        },
+        decline: {
+          title:   'Document Declined',
+          message: 'You have declined to sign this document.',
+          iconClass: 'icon-decline',
+          iconSvg: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9B2335" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+        },
+        session_timeout: {
+          title:   'Session Expired',
+          message: 'Your signing session has timed out. Please try again.',
+          iconClass: 'icon-decline',
+          iconSvg: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9B2335" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+        },
+        ttl_expired: {
+          title:   'Link Expired',
+          message: 'The signing link has expired. Please request a new one.',
+          iconClass: 'icon-decline',
+          iconSvg: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9B2335" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+        },
+      };
+
+      var cfg = messages[dsEvent] || messages['cancel'];
+
+      document.getElementById('title').textContent   = cfg.title;
+      document.getElementById('message').textContent = cfg.message;
+      var iconEl = document.getElementById('icon');
+      iconEl.className = 'icon ' + cfg.iconClass;
+      iconEl.innerHTML = cfg.iconSvg;
+
+      // postMessage to parent (the SPA)
+      var target = window.parent !== window ? window.parent : window.opener;
+      if (target && target !== window) {
+        target.postMessage(
+          { type: 'docusign_return', event: dsEvent },
+          window.location.origin
+        );
+      }
+    })();
+  </script>
+</body>
+</html>
