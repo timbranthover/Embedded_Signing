@@ -1,13 +1,15 @@
 import { Sun, Moon, Bell, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useMailboxStore } from '../../store/mailboxStore'
+import { SIDEBAR_DURATION, SIDEBAR_EASING } from './Layout'
 
 interface TopBarProps {
   theme: 'light' | 'dark'
   onToggleTheme: () => void
+  sidebarWidth: number
 }
 
-export function TopBar({ theme, onToggleTheme }: TopBarProps) {
+export function TopBar({ theme, onToggleTheme, sidebarWidth }: TopBarProps) {
   const { accessToken, user, loading, error, autoAuth } = useAuthStore()
   const pendingCount = useMailboxStore(s =>
     s.items.filter(i => i.status === 'awaiting_signature').length
@@ -15,10 +17,13 @@ export function TopBar({ theme, onToggleTheme }: TopBarProps) {
 
   return (
     <header
-      className="fixed top-0 right-0 left-0 z-20 flex items-center gap-4 px-6 bg-surface/80 backdrop-blur-md border-b border-border"
+      className="fixed top-0 right-0 left-0 z-20 flex items-center gap-4 bg-surface/80 backdrop-blur-md border-b border-border"
       style={{
-        height: 'var(--topbar-height)',
-        paddingLeft: 'calc(var(--sidebar-current-width) + 24px)',
+        height:      'var(--topbar-height)',
+        paddingLeft:  sidebarWidth + 24,
+        paddingRight: 24,
+        // Transition in lockstep with the sidebar
+        transition: `padding-left ${SIDEBAR_DURATION}ms ${SIDEBAR_EASING}`,
       }}
     >
       {/* Search */}
@@ -51,7 +56,7 @@ export function TopBar({ theme, onToggleTheme }: TopBarProps) {
           {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
         </button>
 
-        {/* Auth status — no button, just state indicator */}
+        {/* Auth status */}
         {loading && (
           <div className="flex items-center gap-1.5 h-7 px-3 rounded bg-surface-2 text-secondary text-xs">
             <Loader2 size={12} className="animate-spin" />
