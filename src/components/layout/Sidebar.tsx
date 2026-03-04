@@ -77,7 +77,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className="fixed left-0 top-0 bottom-0 z-30 flex flex-col bg-sidebar border-r border-border overflow-hidden"
+      className="fixed left-0 top-0 bottom-0 z-30 flex flex-col bg-sidebar border-r border-border"
       style={{
         width:      collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED,
         transition: `width ${T_MAIN}`,
@@ -223,7 +223,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* ── Collapse toggle ───────────────────────────────────────────── */}
       <button
         onClick={onToggle}
-        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-surface border border-border rounded-full flex items-center justify-center shadow-card text-secondary hover:text-primary hover:shadow-card-hover transition-shadow z-10"
+        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-surface border border-border rounded-full flex items-center justify-center shadow-card text-secondary hover:text-primary hover:shadow-card-hover transition-all z-10"
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         {/* Single icon that rotates — no snap */}
