@@ -1,7 +1,23 @@
 import { create } from 'zustand'
+import { localStore } from '../lib/storage'
 import type { MailboxItem, Toast, EnvelopeStatus } from '../types'
 
-// ─── Seeded mock items ────────────────────────────────────────────────────
+// ─── Persistence helpers ───────────────────────────────────────────────────
+
+const REAL_ITEMS_KEY = 'real_envelopes'
+
+/** Save only real (non-seed) items to localStorage */
+function persistRealItems(items: MailboxItem[]) {
+  const real = items.filter(i => i.isReal)
+  localStore.set(REAL_ITEMS_KEY, real)
+}
+
+/** Load previously-saved real items (returns [] on first run) */
+function loadRealItems(): MailboxItem[] {
+  return localStore.get<MailboxItem[]>(REAL_ITEMS_KEY) ?? []
+}
+
+// ─── Seeded mock items ─────────────────────────────────────────────────────
 
 const seedItems: MailboxItem[] = [
   {
@@ -78,7 +94,14 @@ const seedItems: MailboxItem[] = [
   },
 ]
 
-// ─── Store ────────────────────────────────────────────────────────────────
+/** Real (persisted) items first, then seeds — real items are always more recent */
+function buildInitialItems(): MailboxItem[] {
+  const real = loadRealItems()
+  const realIds = new Set(real.map(i => i.id))
+  return [...real, ...seedItems.filter(i => !realIds.has(i.id))]
+}
+
+// ─── Store ─────────────────────────────────────────────────────────────────
 
 interface MailboxStore {
   items: MailboxItem[]
@@ -103,7 +126,7 @@ interface MailboxStore {
 }
 
 export const useMailboxStore = create<MailboxStore>((set, get) => ({
-  items: seedItems,
+  items: buildInitialItems(),
   selectedId: null,
   signingUrl: null,
   signingItemId: null,
@@ -117,17 +140,25 @@ export const useMailboxStore = create<MailboxStore>((set, get) => ({
   },
 
   addItem: (item) =>
-    set(s => ({ items: [item, ...s.items], selectedId: item.id })),
+    set(s => {
+      const next = [item, ...s.items]
+      persistRealItems(next)
+      return { items: next, selectedId: item.id }
+    }),
 
   updateStatus: (id, status) =>
-    set(s => ({
-      items: s.items.map(i => i.id === id ? { ...i, status } : i),
-    })),
+    set(s => {
+      const next = s.items.map(i => i.id === id ? { ...i, status } : i)
+      persistRealItems(next)
+      return { items: next }
+    }),
 
   updateEnvelopeId: (id, envelopeId) =>
-    set(s => ({
-      items: s.items.map(i => i.id === id ? { ...i, envelopeId } : i),
-    })),
+    set(s => {
+      const next = s.items.map(i => i.id === id ? { ...i, envelopeId } : i)
+      persistRealItems(next)
+      return { items: next }
+    }),
 
   openSigning: (id, url) =>
     set({ signingUrl: url, signingItemId: id }),
@@ -136,9 +167,11 @@ export const useMailboxStore = create<MailboxStore>((set, get) => ({
     set({ signingUrl: null, signingItemId: null }),
 
   markRead: (id) =>
-    set(s => ({
-      items: s.items.map(i => i.id === id ? { ...i, read: true } : i),
-    })),
+    set(s => {
+      const next = s.items.map(i => i.id === id ? { ...i, read: true } : i)
+      persistRealItems(next)
+      return { items: next }
+    }),
 
   setSendingEnvelope: (sendingEnvelope) => set({ sendingEnvelope }),
 

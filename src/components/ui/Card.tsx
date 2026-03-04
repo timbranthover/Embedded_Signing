@@ -32,14 +32,14 @@ export function Card({
       onClick={onClick}
       className={[
         'rounded-lg bg-surface border',
-        priority ? 'border-accent/40 shadow-sm' : 'border-border',
+        priority ? 'border-accent/40 dark:border-border shadow-sm dark:shadow-none' : 'border-border',
         hoverable || onClick ? 'cursor-pointer transition-shadow duration-150 hover:shadow-card-hover' : 'shadow-card',
         padding !== 'none' ? paddingClasses[padding] : '',
         className,
       ].join(' ')}
     >
       {priority && (
-        <div className="h-0.5 -mt-[1px] -mx-[1px] mb-4 rounded-t-lg bg-accent/60" />
+        <div className="h-0.5 -mt-[1px] -mx-[1px] mb-4 rounded-t-lg bg-accent/60 dark:hidden" />
       )}
       {children}
     </div>

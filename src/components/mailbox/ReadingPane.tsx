@@ -1,15 +1,16 @@
-import { PenLine, AlertCircle } from 'lucide-react'
+import { PenLine, AlertCircle, Download } from 'lucide-react'
 import { useMailboxStore } from '../../store/mailboxStore'
 import { useAuthStore } from '../../store/authStore'
 import { StatusBadge } from '../ui/Badge'
 import { Button } from '../ui/Button'
-import { createRecipientView } from '../../lib/docusign'
+import { createRecipientView, downloadSignedDocument } from '../../lib/docusign'
 import { useState } from 'react'
 
 export function ReadingPane() {
   const { items, selectedId, openSigning, addToast } = useMailboxStore()
   const { accessToken, accountId, baseUri, user } = useAuthStore()
-  const [loadingSign, setLoadingSign] = useState(false)
+  const [loadingSign,     setLoadingSign]     = useState(false)
+  const [loadingDownload, setLoadingDownload] = useState(false)
 
   const item = items.find(i => i.id === selectedId)
 
@@ -24,7 +25,8 @@ export function ReadingPane() {
     )
   }
 
-  const canSign = item.status === 'awaiting_signature' && item.isReal && item.envelopeId
+  const canSign     = item.status === 'awaiting_signature' && item.isReal && item.envelopeId
+  const canDownload = item.status === 'completed'          && item.isReal && item.envelopeId
 
   const handleSign = async () => {
     if (!accessToken || !accountId || !baseUri || !item.envelopeId) return
@@ -52,6 +54,19 @@ export function ReadingPane() {
     }
   }
 
+  const handleDownload = async () => {
+    if (!accessToken || !accountId || !baseUri || !item.envelopeId) return
+    try {
+      setLoadingDownload(true)
+      await downloadSignedDocument(accessToken, accountId, baseUri, item.envelopeId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      addToast({ type: 'error', title: 'Download failed', message: msg })
+    } finally {
+      setLoadingDownload(false)
+    }
+  }
+
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -61,23 +76,24 @@ export function ReadingPane() {
     <div className="flex flex-col h-full overflow-y-auto">
       {/* Header */}
       <div className="px-6 py-5 border-b border-border shrink-0">
-        <div className="flex items-start justify-between gap-4 mb-3">
-          <h2 className="font-display font-semibold text-lg text-primary leading-snug">
-            {item.subject}
-          </h2>
+        {/* Subject — full width, never competes with badge */}
+        <h2 className="font-display font-semibold text-lg text-primary leading-snug mb-2 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">
+          {item.subject}
+        </h2>
+
+        {/* Badge on its own row — no balloon-stretching */}
+        <div className="mb-3">
           <StatusBadge status={item.status} />
         </div>
-        <div className="flex items-center gap-4 text-xs text-secondary">
+
+        {/* Metadata — wraps naturally on narrow panes, no orphaned separators */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-secondary">
           <span>From: <strong className="text-primary">{item.from}</strong></span>
-          <span>·</span>
           <span>{formatDate(item.date)}</span>
           {item.envelopeId && (
-            <>
-              <span>·</span>
-              <span className="font-mono truncate max-w-[140px]" title={item.envelopeId}>
-                env: {item.envelopeId.slice(0, 8)}…
-              </span>
-            </>
+            <span className="font-mono truncate max-w-[140px]" title={item.envelopeId}>
+              env: {item.envelopeId.slice(0, 8)}…
+            </span>
           )}
         </div>
       </div>
@@ -133,6 +149,42 @@ export function ReadingPane() {
                     ? 'Connect DocuSign to sign this document.'
                     : 'This is a mock item. Send a real envelope from the toolbar to sign live.'}
                 </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Download CTA — shown for completed real envelopes */}
+      {item.status === 'completed' && (
+        <div className="px-6 py-4 border-t border-border bg-success-bg/30 shrink-0">
+          {canDownload ? (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success/10 shrink-0">
+                <Download size={15} className="text-success" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-primary">Document signed &amp; complete</p>
+                <p className="text-xs text-secondary">Download a certified PDF copy for your records.</p>
+              </div>
+              <Button
+                variant="accent"
+                size="sm"
+                loading={loadingDownload}
+                icon={<Download size={13} />}
+                onClick={handleDownload}
+              >
+                Download PDF
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success/10 shrink-0">
+                <Download size={15} className="text-success" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-primary">Document completed</p>
+                <p className="text-xs text-secondary">This is a mock item — no PDF to download.</p>
               </div>
             </div>
           )}

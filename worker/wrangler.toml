@@ -2,3 +2,8 @@ name = "arbor-docusign-proxy"
 main = "src/worker.ts"
 compatibility_date = "2024-09-23"
 account_id = "d47c6f2ee415501cfc445767d862c417"
+
+[vars]
+DS_CLIENT_ID = "8065fe18-2bcb-4e42-9358-ce249cd6f2a2"
+DS_AUTH_BASE = "https://account-d.docusign.com"
+# DS_PRIVATE_KEY and DS_USER_ID are stored as Worker secrets (wrangler secret put)

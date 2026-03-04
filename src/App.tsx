@@ -6,25 +6,25 @@ import { Mailbox } from './pages/Mailbox'
 import { useAuthStore } from './store/authStore'
 
 function App() {
-  const restore = useAuthStore(s => s.restore)
+  const { restore, autoAuth } = useAuthStore()
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('arbor_theme')
     if (saved === 'dark' || saved === 'light') return saved
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   })
 
-  // Restore auth from sessionStorage
-  useEffect(() => { restore() }, [restore])
+  // On load: restore from session, or auto-authenticate via JWT Grant
+  useEffect(() => {
+    const hadSession = restore()
+    if (!hadSession) autoAuth()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Apply dark mode class
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     localStorage.setItem('arbor_theme', theme)
   }, [theme])
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light')
-
-  // Determine base path for BrowserRouter
   const basename = import.meta.env.BASE_URL
 
   return (

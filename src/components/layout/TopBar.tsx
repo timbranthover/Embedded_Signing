@@ -1,7 +1,6 @@
-import { Sun, Moon, Bell, Search } from 'lucide-react'
+import { Sun, Moon, Bell, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useMailboxStore } from '../../store/mailboxStore'
-import { ConnectButton } from '../docusign/ConnectButton'
 
 interface TopBarProps {
   theme: 'light' | 'dark'
@@ -9,7 +8,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ theme, onToggleTheme }: TopBarProps) {
-  const { accessToken } = useAuthStore()
+  const { accessToken, user, loading, error, autoAuth } = useAuthStore()
   const pendingCount = useMailboxStore(s =>
     s.items.filter(i => i.status === 'awaiting_signature').length
   )
@@ -25,7 +24,7 @@ export function TopBar({ theme, onToggleTheme }: TopBarProps) {
       {/* Search */}
       <div className="flex items-center gap-2 flex-1 max-w-md">
         <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <input
             type="search"
             placeholder="Search documents…"
@@ -34,10 +33,9 @@ export function TopBar({ theme, onToggleTheme }: TopBarProps) {
         </div>
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-3">
         {/* Notifications */}
-        <button className="relative p-2 rounded hover:bg-surface-2 transition-colors text-secondary hover:text-primary"
-          aria-label="Notifications">
+        <button className="relative p-2 rounded hover:bg-surface-2 transition-colors text-secondary hover:text-primary" aria-label="Notifications">
           <Bell size={16} />
           {pendingCount > 0 && (
             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-accent rounded-full" />
@@ -53,13 +51,29 @@ export function TopBar({ theme, onToggleTheme }: TopBarProps) {
           {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
         </button>
 
-        {/* DocuSign connect */}
-        {!accessToken && <ConnectButton />}
+        {/* Auth status — no button, just state indicator */}
+        {loading && (
+          <div className="flex items-center gap-1.5 h-7 px-3 rounded bg-surface-2 text-secondary text-xs">
+            <Loader2 size={12} className="animate-spin" />
+            <span>Connecting…</span>
+          </div>
+        )}
 
-        {accessToken && (
-          <div className="flex items-center gap-1.5 h-7 px-3 rounded bg-success-bg text-success text-xs font-semibold border border-success/20">
+        {!loading && error && (
+          <button
+            onClick={() => autoAuth()}
+            title={error}
+            className="flex items-center gap-1.5 h-7 px-3 rounded bg-red-500/10 text-red-400 text-xs border border-red-500/20 hover:bg-red-500/20 transition-colors"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+            Auth error — retry
+          </button>
+        )}
+
+        {!loading && !error && accessToken && (
+          <div className="flex items-center gap-2 h-7 px-3 rounded bg-success-bg text-success text-xs font-semibold border border-success/20">
             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-            DocuSign connected
+            {user?.name ?? 'Connected'}
           </div>
         )}
       </div>

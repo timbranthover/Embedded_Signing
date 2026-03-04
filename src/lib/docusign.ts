@@ -2,7 +2,7 @@ import type { DSUser, DSTokenResponse } from '../types'
 
 const CLIENT_ID   = import.meta.env.VITE_DS_CLIENT_ID   ?? '5474e846-98a1-47b7-b9bd-b7f31c3fad9c'
 const AUTH_BASE   = import.meta.env.VITE_DS_AUTH_BASE   ?? 'https://account-d.docusign.com'
-const SCOPES      = import.meta.env.VITE_DS_SCOPES      ?? 'signature cors openid profile email'
+const SCOPES      = import.meta.env.VITE_DS_SCOPES      ?? 'signature openid profile email'
 const TEMPLATE_ID = import.meta.env.VITE_DS_TEMPLATE_ID ?? 'd880d558-b959-4cc8-a4c1-2aff259c829f'
 const ROLE_NAME   = import.meta.env.VITE_DS_TEMPLATE_ROLE_NAME ?? 'Signer'
 const CLIENT_USER_ID = import.meta.env.VITE_DS_CLIENT_USER_ID ?? '1000'
@@ -11,6 +11,21 @@ const API_MODE    = (import.meta.env.VITE_DS_API_MODE ?? 'direct') as 'direct' |
 const WORKER_URL  = (import.meta.env.VITE_DS_WORKER_URL ?? '').replace(/\/$/, '')
 
 export { CLIENT_ID, AUTH_BASE, SCOPES, TEMPLATE_ID, ROLE_NAME, CLIENT_USER_ID, API_MODE, WORKER_URL }
+
+// ─── JWT auto-authentication (no popup, no button) ───────────────────────
+
+export async function autoAuthenticate(): Promise<{ access_token: string; user: DSUser }> {
+  if (!WORKER_URL) throw new Error('VITE_DS_WORKER_URL is not configured')
+  const resp = await fetch(`${WORKER_URL}/auth/auto-token`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  })
+  if (!resp.ok) {
+    const text = await resp.text()
+    throw new Error(`Auto-auth failed (${resp.status}): ${text}`)
+  }
+  return resp.json() as Promise<{ access_token: string; user: DSUser }>
+}
 
 // ─── OAuth helpers ────────────────────────────────────────────────────────
 
@@ -203,4 +218,42 @@ export async function getEnvelopeStatus(
 
   const data = (await resp.json()) as { status: string }
   return data.status
+}
+
+export async function downloadSignedDocument(
+  accessToken: string,
+  accountId: string,
+  baseUri: string,
+  envelopeId: string,
+  filename = `signed-document-${envelopeId.slice(0, 8)}.pdf`
+): Promise<void> {
+  const base = apiBase(baseUri)
+  const url  = `${base}/accounts/${accountId}/envelopes/${envelopeId}/documents/combined`
+
+  // Build headers manually so we can set Accept: application/pdf
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    Accept: 'application/pdf',
+  }
+  if (WORKER_URL && baseUri) {
+    headers['X-DocuSign-Base-Uri'] = baseUri
+  }
+
+  const resp = await fetch(url, { method: 'GET', headers })
+
+  if (!resp.ok) {
+    const text = await resp.text()
+    throw new Error(`Document download failed (${resp.status}): ${text}`)
+  }
+
+  // Trigger browser save-as dialog
+  const blob      = await resp.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const anchor    = document.createElement('a')
+  anchor.href     = objectUrl
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+  URL.revokeObjectURL(objectUrl)
 }
