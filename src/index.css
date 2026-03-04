@@ -137,6 +137,18 @@ body {
 .data-table tr:hover td { background: var(--color-surface-2); }
 .data-table .num { font-variant-numeric: tabular-nums; text-align: right; }
 
+/* ─── Signing completion animations ─────────────────────────────────────── */
+@keyframes completion-pop {
+  0%   { opacity: 0; transform: scale(0.5); }
+  60%  { opacity: 1; transform: scale(1.12); }
+  80%  {             transform: scale(0.96); }
+  100% {             transform: scale(1);    }
+}
+@keyframes completion-fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
 /* ─── Toast ──────────────────────────────────────────────────────────────── */
 @keyframes toast-in {
   from { transform: translateY(16px); opacity: 0; }
