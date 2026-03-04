@@ -2,17 +2,13 @@ import React, { useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { ToastContainer } from '../ui/Toast'
+import { SIDEBAR_EXPANDED, SIDEBAR_COLLAPSED, SIDEBAR_DURATION, SIDEBAR_EASING } from './sidebarConfig'
 
 interface LayoutProps {
   children: React.ReactNode
   theme: 'light' | 'dark'
   onToggleTheme: () => void
 }
-
-export const SIDEBAR_EXPANDED  = 240
-export const SIDEBAR_COLLAPSED = 56
-export const SIDEBAR_DURATION  = 280  // ms — shared by sidebar, topbar, main
-export const SIDEBAR_EASING    = 'cubic-bezier(0.4, 0, 0.2, 1)'  // Material standard
 
 export function Layout({ children, theme, onToggleTheme }: LayoutProps) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {

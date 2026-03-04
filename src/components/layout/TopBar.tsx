@@ -1,7 +1,7 @@
 import { Sun, Moon, Bell, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useMailboxStore } from '../../store/mailboxStore'
-import { SIDEBAR_DURATION, SIDEBAR_EASING } from './Layout'
+import { SIDEBAR_DURATION, SIDEBAR_EASING } from './sidebarConfig'
 
 interface TopBarProps {
   theme: 'light' | 'dark'

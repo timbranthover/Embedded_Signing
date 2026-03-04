@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useMailboxStore } from '../../store/mailboxStore'
-import { SIDEBAR_EXPANDED, SIDEBAR_COLLAPSED, SIDEBAR_DURATION, SIDEBAR_EASING } from './Layout'
+import { SIDEBAR_EXPANDED, SIDEBAR_COLLAPSED, SIDEBAR_DURATION, SIDEBAR_EASING } from './sidebarConfig'
 
 interface SidebarProps {
   collapsed: boolean
