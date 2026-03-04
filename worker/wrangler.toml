@@ -1,0 +1,4 @@
+name = "arbor-docusign-proxy"
+main = "src/worker.ts"
+compatibility_date = "2024-09-23"
+account_id = "d47c6f2ee415501cfc445767d862c417"

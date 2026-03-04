@@ -47,11 +47,18 @@ export async function exchangeCodeForToken(
     code_verifier: verifier,
   })
 
-  // For PKCE public client, no client_secret is needed.
-  // DocuSign may require Basic header with clientId: (empty secret).
+  // DocuSign's auth server (account-d.docusign.com) never sends CORS headers
+  // to browser requests on /oauth/token — this is a hard platform limitation.
+  // Route through the Worker if a Worker URL is configured; fall back to direct
+  // (which will fail with CORS in a browser but works in dev tools / curl).
+  const tokenUrl = WORKER_URL
+    ? `${WORKER_URL}/oauth/token`
+    : `${AUTH_BASE}/oauth/token`
+
+  // Basic auth with clientId only (no secret — PKCE replaces the secret)
   const credentials = btoa(`${CLIENT_ID}:`)
 
-  const resp = await fetch(`${AUTH_BASE}/oauth/token`, {
+  const resp = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -79,7 +86,8 @@ export async function fetchUserInfo(accessToken: string): Promise<DSUser> {
 // ─── DocuSign REST API ────────────────────────────────────────────────────
 
 function apiBase(baseUri: string): string {
-  if (API_MODE === 'worker' && WORKER_URL) {
+  // Use Worker whenever a URL is configured (handles REST API CORS too)
+  if (WORKER_URL) {
     return WORKER_URL + '/docusign'
   }
   return `${baseUri}/restapi/v2.1`
@@ -97,8 +105,8 @@ async function dsRequest(
     'Content-Type': 'application/json',
     Accept: 'application/json',
   }
-  // In worker mode pass the base_uri as a header for the worker to use
-  if (API_MODE === 'worker' && baseUri) {
+  // Pass base_uri header so the Worker knows where to forward the request
+  if (WORKER_URL && baseUri) {
     headers['X-DocuSign-Base-Uri'] = baseUri
   }
 

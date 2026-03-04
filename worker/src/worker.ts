@@ -1,14 +1,13 @@
 /**
  * Arbor Wealth — DocuSign CORS Proxy Worker
  *
- * Forwards DocuSign REST API calls from the browser with correct CORS headers.
- * The browser sends its own Bearer token; this worker never stores credentials.
+ * Solves two separate CORS problems:
+ *   1. account-d.docusign.com/oauth/token  — auth server never sends CORS headers to browsers
+ *   2. demo.docusign.net REST API           — needs CORS headers unless origins are registered
  *
- * Routes:
- *   /docusign/*  →  {base_uri}/restapi/{rest_of_path}
- *
- * Required header from browser:
- *   X-DocuSign-Base-Uri: https://demo.docusign.net  (or similar *.docusign.net)
+ * Routes (all require Origin to be in ALLOWED_ORIGINS):
+ *   POST /oauth/token    → https://account-d.docusign.com/oauth/token
+ *   ANY  /docusign/*     → {X-DocuSign-Base-Uri}/restapi/v2.1/{rest_of_path}
  */
 
 const ALLOWED_ORIGINS = [
@@ -17,107 +16,135 @@ const ALLOWED_ORIGINS = [
 ]
 
 const ALLOWED_BASE_URI_PATTERN = /^https:\/\/[a-z0-9-]+\.docusign\.net$/i
+const DS_AUTH_BASE = 'https://account-d.docusign.com'
 
-const CORS_HEADERS = (origin: string) => ({
-  'Access-Control-Allow-Origin':  origin,
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, X-DocuSign-Base-Uri',
-  'Access-Control-Max-Age':       '86400',
-  'Vary':                         'Origin',
-})
+function corsHeaders(origin: string): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin':  origin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, X-DocuSign-Base-Uri',
+    'Access-Control-Max-Age':       '86400',
+    'Vary':                         'Origin',
+  }
+}
+
+function jsonError(msg: string, status: number, origin: string): Response {
+  return new Response(JSON.stringify({ error: msg }), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+  })
+}
 
 export default {
   async fetch(request: Request): Promise<Response> {
     const origin = request.headers.get('Origin') ?? ''
-    const isAllowedOrigin = ALLOWED_ORIGINS.includes(origin)
+    const allowed = ALLOWED_ORIGINS.includes(origin)
 
-    // CORS preflight
+    // ── CORS preflight ──────────────────────────────────────────────────────
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
-        headers: CORS_HEADERS(isAllowedOrigin ? origin : ALLOWED_ORIGINS[0]),
+        headers: corsHeaders(allowed ? origin : ALLOWED_ORIGINS[0]),
       })
     }
 
-    if (!isAllowedOrigin) {
-      return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
+    if (!allowed) {
+      return jsonError(`Origin "${origin}" not allowed`, 403, ALLOWED_ORIGINS[0])
+    }
+
+    const url  = new URL(request.url)
+    const path = url.pathname
+
+    // ── Route: /oauth/token  (proxy to DocuSign auth server) ───────────────
+    // account-d.docusign.com never adds CORS headers to /oauth/token —
+    // this is a hard DocuSign limitation for browser-only apps.
+    // We proxy the call here and add our own CORS headers on the response.
+    if (path === '/oauth/token') {
+      if (request.method !== 'POST') {
+        return jsonError('Method not allowed', 405, origin)
+      }
+
+      const targetUrl = `${DS_AUTH_BASE}/oauth/token`
+      const proxyHeaders = new Headers()
+
+      const ct   = request.headers.get('Content-Type')
+      const auth = request.headers.get('Authorization')
+      if (ct)   proxyHeaders.set('Content-Type',  ct)
+      if (auth) proxyHeaders.set('Authorization', auth)
+      proxyHeaders.set('Accept', 'application/json')
+
+      let dsResponse: Response
+      try {
+        dsResponse = await fetch(targetUrl, {
+          method:  'POST',
+          headers: proxyHeaders,
+          body:    await request.text(),
+        })
+      } catch (err) {
+        return jsonError(`Upstream fetch failed: ${String(err)}`, 502, origin)
+      }
+
+      const respHeaders = new Headers(dsResponse.headers)
+      for (const [k, v] of Object.entries(corsHeaders(origin))) {
+        respHeaders.set(k, v)
+      }
+
+      return new Response(dsResponse.body, {
+        status:  dsResponse.status,
+        headers: respHeaders,
       })
     }
 
-    const url = new URL(request.url)
-    const path = url.pathname  // e.g. /docusign/v2.1/accounts/xxx/envelopes
+    // ── Route: /docusign/*  (proxy to DocuSign REST API) ───────────────────
+    if (path.startsWith('/docusign/')) {
+      const baseUri = request.headers.get('X-DocuSign-Base-Uri') ?? ''
+      if (!ALLOWED_BASE_URI_PATTERN.test(baseUri)) {
+        return jsonError(
+          `Missing or invalid X-DocuSign-Base-Uri header. Expected *.docusign.net, got "${baseUri}"`,
+          400, origin
+        )
+      }
 
-    // Only handle /docusign/* paths
-    if (!path.startsWith('/docusign/')) {
-      return new Response(JSON.stringify({ error: 'Not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS(origin) },
+      // Strip /docusign prefix; ensure /v2.1 is present
+      const restPath   = path.slice('/docusign'.length)
+      const targetPath = restPath.startsWith('/v2.1')
+        ? `/restapi${restPath}`
+        : `/restapi/v2.1${restPath}`
+      const targetUrl  = `${baseUri}${targetPath}${url.search}`
+
+      const proxyHeaders = new Headers()
+      const auth = request.headers.get('Authorization')
+      const ct   = request.headers.get('Content-Type')
+      if (auth) proxyHeaders.set('Authorization', auth)
+      if (ct)   proxyHeaders.set('Content-Type',  ct)
+      proxyHeaders.set('Accept',     'application/json')
+      proxyHeaders.set('User-Agent', 'ArborWealth-CFWorker/1.0')
+
+      const hasBody = !['GET', 'HEAD'].includes(request.method)
+
+      let dsResponse: Response
+      try {
+        dsResponse = await fetch(targetUrl, {
+          method:  request.method,
+          headers: proxyHeaders,
+          body:    hasBody ? await request.arrayBuffer() : undefined,
+        })
+      } catch (err) {
+        return jsonError(`Upstream fetch failed: ${String(err)}`, 502, origin)
+      }
+
+      const respHeaders = new Headers(dsResponse.headers)
+      for (const [k, v] of Object.entries(corsHeaders(origin))) {
+        respHeaders.set(k, v)
+      }
+      respHeaders.delete('X-Frame-Options')
+
+      return new Response(dsResponse.body, {
+        status:  dsResponse.status,
+        headers: respHeaders,
       })
     }
 
-    // Validate base URI from header
-    const baseUri = request.headers.get('X-DocuSign-Base-Uri') ?? ''
-    if (!ALLOWED_BASE_URI_PATTERN.test(baseUri)) {
-      return new Response(
-        JSON.stringify({ error: `Invalid or missing X-DocuSign-Base-Uri header. Got: "${baseUri}". Expected *.docusign.net` }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS(origin) },
-        }
-      )
-    }
-
-    // Strip /docusign prefix and reconstruct target URL
-    // /docusign/accounts/xxx/envelopes → {baseUri}/restapi/v2.1/accounts/xxx/envelopes
-    const restPath = path.slice('/docusign'.length)  // e.g. /v2.1/accounts/xxx/envelopes or /accounts/xxx/envelopes
-
-    // Ensure we have /v2.1 prefix
-    const targetPath = restPath.startsWith('/v2.1') ? restPath : `/restapi/v2.1${restPath}`
-    const targetUrl  = `${baseUri}${targetPath}${url.search}`
-
-    // Forward the request
-    const proxyHeaders = new Headers()
-    // Copy relevant headers
-    const authorization = request.headers.get('Authorization')
-    if (authorization) proxyHeaders.set('Authorization', authorization)
-    const contentType = request.headers.get('Content-Type')
-    if (contentType) proxyHeaders.set('Content-Type', contentType)
-    proxyHeaders.set('Accept', 'application/json')
-    proxyHeaders.set('User-Agent', 'ArborWealth-CFWorker/1.0')
-
-    const body = ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer()
-
-    let dsResponse: Response
-    try {
-      dsResponse = await fetch(targetUrl, {
-        method:  request.method,
-        headers: proxyHeaders,
-        body,
-      })
-    } catch (err) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to reach DocuSign', detail: String(err) }),
-        {
-          status: 502,
-          headers: { 'Content-Type': 'application/json', ...CORS_HEADERS(origin) },
-        }
-      )
-    }
-
-    // Return response with CORS headers added
-    const respHeaders = new Headers(dsResponse.headers)
-    const cors = CORS_HEADERS(origin)
-    for (const [k, v] of Object.entries(cors)) {
-      respHeaders.set(k, v)
-    }
-    // Remove security headers that might conflict
-    respHeaders.delete('X-Frame-Options')
-
-    return new Response(dsResponse.body, {
-      status:  dsResponse.status,
-      headers: respHeaders,
-    })
+    return jsonError('Not found. Valid routes: /oauth/token, /docusign/*', 404, origin)
   },
 }
