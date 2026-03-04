@@ -72,6 +72,9 @@ export default {
       if (ct)   proxyHeaders.set('Content-Type',  ct)
       if (auth) proxyHeaders.set('Authorization', auth)
       proxyHeaders.set('Accept', 'application/json')
+      // DocuSign requires Origin to be present in the token exchange request.
+      // Cloudflare Workers (unlike browsers) can set Origin on outgoing fetches.
+      proxyHeaders.set('Origin', origin)
 
       let dsResponse: Response
       try {
