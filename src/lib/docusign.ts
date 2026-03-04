@@ -1,10 +1,10 @@
 import type { DSUser, DSTokenResponse } from '../types'
 
-const CLIENT_ID   = import.meta.env.VITE_DS_CLIENT_ID   ?? 'e3b57567-c8d9-4a8c-9afa-a9c17d6c0e6c'
+const CLIENT_ID   = import.meta.env.VITE_DS_CLIENT_ID   ?? '5474e846-98a1-47b7-b9bd-b7f31c3fad9c'
 const AUTH_BASE   = import.meta.env.VITE_DS_AUTH_BASE   ?? 'https://account-d.docusign.com'
 const SCOPES      = import.meta.env.VITE_DS_SCOPES      ?? 'signature cors openid profile email'
 const TEMPLATE_ID = import.meta.env.VITE_DS_TEMPLATE_ID ?? 'd880d558-b959-4cc8-a4c1-2aff259c829f'
-const ROLE_NAME   = import.meta.env.VITE_DS_TEMPLATE_ROLE_NAME ?? 'signer'
+const ROLE_NAME   = import.meta.env.VITE_DS_TEMPLATE_ROLE_NAME ?? 'Signer'
 const CLIENT_USER_ID = import.meta.env.VITE_DS_CLIENT_USER_ID ?? '1000'
 
 const API_MODE    = (import.meta.env.VITE_DS_API_MODE ?? 'direct') as 'direct' | 'worker'
