@@ -1,4 +1,4 @@
-import { Sun, Moon, Bell, Loader2 } from 'lucide-react'
+import { Sun, Moon, Bell, Loader2, Menu } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useMailboxStore } from '../../store/mailboxStore'
 import { SIDEBAR_DURATION, SIDEBAR_EASING } from './sidebarConfig'
@@ -7,9 +7,11 @@ interface TopBarProps {
   theme: 'light' | 'dark'
   onToggleTheme: () => void
   sidebarWidth: number
+  isMobile: boolean
+  onOpenMobile: () => void
 }
 
-export function TopBar({ theme, onToggleTheme, sidebarWidth }: TopBarProps) {
+export function TopBar({ theme, onToggleTheme, sidebarWidth, isMobile, onOpenMobile }: TopBarProps) {
   const { accessToken, user, loading, error, autoAuth } = useAuthStore()
   const pendingCount = useMailboxStore(s =>
     s.items.filter(i => i.status === 'awaiting_signature').length
@@ -17,15 +19,26 @@ export function TopBar({ theme, onToggleTheme, sidebarWidth }: TopBarProps) {
 
   return (
     <header
-      className="fixed top-0 right-0 left-0 z-20 flex items-center gap-4 bg-surface/80 backdrop-blur-md border-b border-border"
+      className="fixed top-0 right-0 left-0 z-20 flex items-center gap-3 bg-surface/80 backdrop-blur-md border-b border-border"
       style={{
         height:      'var(--topbar-height)',
         paddingLeft:  sidebarWidth + 24,
         paddingRight: 24,
-        // Transition in lockstep with the sidebar
-        transition: `padding-left ${SIDEBAR_DURATION}ms ${SIDEBAR_EASING}`,
+        // Transition in lockstep with the sidebar on desktop only
+        transition: isMobile ? undefined : `padding-left ${SIDEBAR_DURATION}ms ${SIDEBAR_EASING}`,
       }}
     >
+      {/* Hamburger — mobile only */}
+      {isMobile && (
+        <button
+          onClick={onOpenMobile}
+          className="flex items-center justify-center w-8 h-8 rounded hover:bg-surface-2 text-secondary hover:text-primary transition-colors shrink-0 -ml-1"
+          aria-label="Open navigation menu"
+        >
+          <Menu size={18} />
+        </button>
+      )}
+
       {/* Search */}
       <div className="flex items-center gap-2 flex-1 max-w-md">
         <div className="relative flex-1">
@@ -60,7 +73,7 @@ export function TopBar({ theme, onToggleTheme, sidebarWidth }: TopBarProps) {
         {loading && (
           <div className="flex items-center gap-1.5 h-7 px-3 rounded bg-surface-2 text-secondary text-xs">
             <Loader2 size={12} className="animate-spin" />
-            <span>Connecting…</span>
+            <span className="hidden sm:inline">Connecting…</span>
           </div>
         )}
 
@@ -71,14 +84,16 @@ export function TopBar({ theme, onToggleTheme, sidebarWidth }: TopBarProps) {
             className="flex items-center gap-1.5 h-7 px-3 rounded bg-red-500/10 text-red-400 text-xs border border-red-500/20 hover:bg-red-500/20 transition-colors"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-            Auth error — retry
+            <span className="hidden sm:inline">Auth error — retry</span>
+            <span className="sm:hidden">Error</span>
           </button>
         )}
 
         {!loading && !error && accessToken && (
           <div className="flex items-center gap-2 h-7 px-3 rounded bg-success-bg text-success text-xs font-semibold border border-success/20">
             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-            {user?.name ?? 'Connected'}
+            <span className="hidden sm:inline">{user?.name ?? 'Connected'}</span>
+            <span className="sm:hidden">Live</span>
           </div>
         )}
       </div>

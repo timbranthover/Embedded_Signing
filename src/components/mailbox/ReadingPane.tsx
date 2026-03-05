@@ -1,4 +1,4 @@
-import { PenLine, AlertCircle, Download } from 'lucide-react'
+import { PenLine, AlertCircle, Download, ArrowLeft } from 'lucide-react'
 import { useMailboxStore } from '../../store/mailboxStore'
 import { useAuthStore } from '../../store/authStore'
 import { StatusBadge } from '../ui/Badge'
@@ -6,7 +6,12 @@ import { Button } from '../ui/Button'
 import { createRecipientView, downloadSignedDocument } from '../../lib/docusign'
 import { useState } from 'react'
 
-export function ReadingPane() {
+interface ReadingPaneProps {
+  /** When provided (mobile), a back arrow is shown to return to the message list */
+  onMobileBack?: () => void
+}
+
+export function ReadingPane({ onMobileBack }: ReadingPaneProps) {
   const { items, selectedId, openSigning, addToast } = useMailboxStore()
   const { accessToken, accountId, baseUri, user } = useAuthStore()
   const [loadingSign,     setLoadingSign]     = useState(false)
@@ -16,8 +21,17 @@ export function ReadingPane() {
 
   if (!item) {
     return (
-      <div className="flex-1 flex items-center justify-center text-secondary">
+      <div className="flex-1 flex items-center justify-center text-secondary h-full">
         <div className="text-center">
+          {onMobileBack && (
+            <button
+              onClick={onMobileBack}
+              className="flex items-center gap-1.5 text-xs text-secondary hover:text-primary transition-colors mx-auto mb-4"
+            >
+              <ArrowLeft size={14} />
+              Back
+            </button>
+          )}
           <p className="text-sm font-medium">Select a document to read</p>
           <p className="text-xs text-tertiary mt-1">Click any item in the list</p>
         </div>
@@ -76,6 +90,18 @@ export function ReadingPane() {
     <div className="flex flex-col h-full overflow-y-auto">
       {/* Header */}
       <div className="px-6 py-5 border-b border-border shrink-0">
+        {/* Back button — mobile only */}
+        {onMobileBack && (
+          <button
+            onClick={onMobileBack}
+            className="flex items-center gap-1.5 text-xs text-secondary hover:text-primary transition-colors mb-3 -ml-0.5"
+            aria-label="Back to document list"
+          >
+            <ArrowLeft size={14} />
+            All documents
+          </button>
+        )}
+
         {/* Subject — full width, never competes with badge */}
         <h2 className="font-display font-semibold text-lg text-primary leading-snug mb-2 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">
           {item.subject}
@@ -125,7 +151,7 @@ export function ReadingPane() {
           {canSign ? (
             <div className="flex items-center gap-3">
               <PenLine size={16} className="text-warning shrink-0" />
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-primary">Your signature is required</p>
                 <p className="text-xs text-secondary">Complete this document to proceed.</p>
               </div>
@@ -142,7 +168,7 @@ export function ReadingPane() {
           ) : (
             <div className="flex items-center gap-3">
               <AlertCircle size={16} className="text-warning shrink-0" />
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-primary">Signature required</p>
                 <p className="text-xs text-secondary">
                   {item.isReal
@@ -163,7 +189,7 @@ export function ReadingPane() {
               <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success/10 shrink-0">
                 <Download size={15} className="text-success" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-primary">Document signed &amp; complete</p>
                 <p className="text-xs text-secondary">Download a certified PDF copy for your records.</p>
               </div>
@@ -182,7 +208,7 @@ export function ReadingPane() {
               <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success/10 shrink-0">
                 <Download size={15} className="text-success" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-primary">Document completed</p>
                 <p className="text-xs text-secondary">This is a mock item — no PDF to download.</p>
               </div>

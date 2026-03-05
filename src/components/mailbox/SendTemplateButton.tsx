@@ -109,7 +109,7 @@ export function SendTemplateButton() {
 
       {/* Email override popover */}
       {showEmailInput && (
-        <div className="absolute top-full mt-2 right-0 z-50 w-80 bg-surface border border-border rounded-xl shadow-modal p-4 space-y-3">
+        <div className="absolute top-full mt-2 right-0 z-50 w-80 max-w-[calc(100vw-2rem)] bg-surface border border-border rounded-xl shadow-modal p-4 space-y-3">
           <p className="text-sm font-semibold text-primary">Send to</p>
           <div className="space-y-2">
             <div>

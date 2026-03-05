@@ -16,6 +16,9 @@ import { SIDEBAR_EXPANDED, SIDEBAR_COLLAPSED, SIDEBAR_DURATION, SIDEBAR_EASING }
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
+  isMobile: boolean
+  mobileOpen: boolean
+  onMobileClose: () => void
 }
 
 // ── Shared transition strings ────────────────────────────────────────────────
@@ -55,12 +58,16 @@ function navRowStyle(collapsed: boolean): React.CSSProperties {
   }
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, isMobile, mobileOpen, onMobileClose }: SidebarProps) {
   const { user, logout } = useAuthStore()
   const navigate          = useNavigate()
   const pendingCount      = useMailboxStore(s =>
     s.items.filter(i => i.status === 'awaiting_signature').length
   )
+
+  // On mobile the sidebar is always visually expanded (full width);
+  // collapse logic only applies on desktop.
+  const isCollapsed = !isMobile && collapsed
 
   const navItems = [
     { to: '/',        label: 'Dashboard',  icon: <LayoutDashboard size={16} /> },
@@ -75,12 +82,25 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     navigate('/')
   }
 
+  // Close drawer when a nav link is tapped on mobile
+  const handleNavClick = () => {
+    if (isMobile) onMobileClose()
+  }
+
   return (
     <aside
-      className="fixed left-0 top-0 bottom-0 z-30 flex flex-col bg-sidebar border-r border-border"
+      className="fixed left-0 top-0 bottom-0 flex flex-col bg-sidebar border-r border-border"
       style={{
-        width:      collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED,
-        transition: `width ${T_MAIN}`,
+        // Desktop: width animates between expanded/collapsed
+        // Mobile: always expanded width, slides in/out via transform
+        width: isMobile ? SIDEBAR_EXPANDED : (collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED),
+        zIndex: isMobile ? 40 : 30,
+        transform: isMobile
+          ? (mobileOpen ? 'translateX(0)' : 'translateX(-100%)')
+          : 'none',
+        transition: isMobile
+          ? `transform ${SIDEBAR_DURATION}ms ${SIDEBAR_EASING}`
+          : `width ${T_MAIN}`,
       }}
     >
       {/* ── Logo ─────────────────────────────────────────────────────── */}
@@ -88,9 +108,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         className="flex items-center border-b border-border shrink-0"
         style={{
           height:      'var(--topbar-height)',
-          paddingLeft:  collapsed ? 14 : 20,
-          paddingRight: collapsed ? 14 : 20,
-          gap:          collapsed ? 0 : 12,
+          paddingLeft:  isCollapsed ? 14 : 20,
+          paddingRight: isCollapsed ? 14 : 20,
+          gap:          isCollapsed ? 0 : 12,
           transition:  `padding-left ${T_MAIN}, padding-right ${T_MAIN}, gap ${T_MAIN}`,
         }}
       >
@@ -103,8 +123,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <div
           style={{
             overflow:   'hidden',
-            opacity:    collapsed ? 0 : 1,
-            maxWidth:   collapsed ? 0 : 160,
+            opacity:    isCollapsed ? 0 : 1,
+            maxWidth:   isCollapsed ? 0 : 160,
             transition: T_LABEL,
             whiteSpace: 'nowrap',
           }}
@@ -121,11 +141,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <div
               key={i}
               className="sidebar-nav-item opacity-40 cursor-not-allowed"
-              style={navRowStyle(collapsed)}
-              title={collapsed ? item.label : undefined}
+              style={navRowStyle(isCollapsed)}
+              title={isCollapsed ? item.label : undefined}
             >
               <span className="shrink-0">{item.icon}</span>
-              <NavLabel collapsed={collapsed}>{item.label}</NavLabel>
+              <NavLabel collapsed={isCollapsed}>{item.label}</NavLabel>
             </div>
           ) : (
             <NavLink
@@ -135,12 +155,13 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               className={({ isActive }) =>
                 ['sidebar-nav-item relative', isActive ? 'active' : ''].join(' ')
               }
-              style={navRowStyle(collapsed)}
-              title={collapsed ? item.label : undefined}
+              style={navRowStyle(isCollapsed)}
+              title={isCollapsed ? item.label : undefined}
+              onClick={handleNavClick}
             >
               <span className="shrink-0">{item.icon}</span>
 
-              <NavLabel collapsed={collapsed}>{item.label}</NavLabel>
+              <NavLabel collapsed={isCollapsed}>{item.label}</NavLabel>
 
               {/* Badge — full pill when expanded, tiny dot when collapsed */}
               {item.badge != null && item.badge > 0 && (
@@ -149,8 +170,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   <span
                     className="ml-auto min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-accent text-white text-2xs font-bold overflow-hidden whitespace-nowrap"
                     style={{
-                      opacity:    collapsed ? 0 : 1,
-                      maxWidth:   collapsed ? 0 : 36,
+                      opacity:    isCollapsed ? 0 : 1,
+                      maxWidth:   isCollapsed ? 0 : 36,
                       transition: T_LABEL,
                     }}
                   >
@@ -161,7 +182,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   <span
                     className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-accent"
                     style={{
-                      opacity:    collapsed ? 1 : 0,
+                      opacity:    isCollapsed ? 1 : 0,
                       transition: `opacity 120ms ease`,
                     }}
                   />
@@ -179,11 +200,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <div
             className="flex items-center rounded-lg"
             style={{
-              paddingLeft:  collapsed ? 10 : 12,
-              paddingRight: collapsed ? 10 : 12,
+              paddingLeft:  isCollapsed ? 10 : 12,
+              paddingRight: isCollapsed ? 10 : 12,
               paddingTop:   8,
               paddingBottom: 8,
-              gap:          collapsed ? 0 : 10,
+              gap:          isCollapsed ? 0 : 10,
               transition:   `padding-left ${T_MAIN}, padding-right ${T_MAIN}, gap ${T_MAIN}`,
             }}
           >
@@ -195,8 +216,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <div
               style={{
                 overflow:   'hidden',
-                opacity:    collapsed ? 0 : 1,
-                maxWidth:   collapsed ? 0 : 180,
+                opacity:    isCollapsed ? 0 : 1,
+                maxWidth:   isCollapsed ? 0 : 180,
                 transition: T_LABEL,
                 whiteSpace: 'nowrap',
                 minWidth:   0,
@@ -212,29 +233,31 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <button
           onClick={handleLogout}
           className="sidebar-nav-item w-full text-left"
-          style={navRowStyle(collapsed)}
-          title={collapsed ? 'Sign out' : undefined}
+          style={navRowStyle(isCollapsed)}
+          title={isCollapsed ? 'Sign out' : undefined}
         >
           <LogOut size={15} className="shrink-0" />
-          <NavLabel collapsed={collapsed}>Sign out</NavLabel>
+          <NavLabel collapsed={isCollapsed}>Sign out</NavLabel>
         </button>
       </div>
 
-      {/* ── Collapse toggle ───────────────────────────────────────────── */}
-      <button
-        onClick={onToggle}
-        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-surface border border-border rounded-full flex items-center justify-center shadow-card text-secondary hover:text-primary hover:shadow-card-hover transition-all z-10"
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      >
-        {/* Single icon that rotates — no snap */}
-        <ChevronLeft
-          size={12}
-          style={{
-            transform:  collapsed ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: `transform ${T_MAIN}`,
-          }}
-        />
-      </button>
+      {/* ── Collapse toggle — desktop only ────────────────────────────── */}
+      {!isMobile && (
+        <button
+          onClick={onToggle}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-surface border border-border rounded-full flex items-center justify-center shadow-card text-secondary hover:text-primary hover:shadow-card-hover transition-all z-10"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {/* Single icon that rotates — no snap */}
+          <ChevronLeft
+            size={12}
+            style={{
+              transform:  collapsed ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: `transform ${T_MAIN}`,
+            }}
+          />
+        </button>
+      )}
     </aside>
   )
 }

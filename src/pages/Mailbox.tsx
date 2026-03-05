@@ -1,22 +1,42 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Filter } from 'lucide-react'
 import { MessageList } from '../components/mailbox/MessageList'
 import { ReadingPane } from '../components/mailbox/ReadingPane'
 import { SigningPanel } from '../components/mailbox/SigningPanel'
 import { SendTemplateButton } from '../components/mailbox/SendTemplateButton'
 import { useMailboxStore } from '../store/mailboxStore'
+import { useIsMobile } from '../hooks/useIsMobile'
+
+type MobilePanel = 'list' | 'reading' | 'signing'
 
 export function Mailbox() {
   const { items, selectedId, signingUrl } = useMailboxStore()
   const unreadCount = items.filter(i => !i.read).length
   const toolbarRef = useRef<HTMLDivElement>(null)
+  const isMobile = useIsMobile()
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>('list')
 
-  // Auto-select first item on mount if nothing selected
+  // Auto-select first item on mount — desktop only
   useEffect(() => {
-    if (!selectedId && items.length > 0) {
+    if (!isMobile && !selectedId && items.length > 0) {
       useMailboxStore.getState().selectItem(items[0].id)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // When signingUrl is opened, switch to signing panel
+  useEffect(() => {
+    if (isMobile && signingUrl) {
+      setMobilePanel('signing')
+    }
+  }, [isMobile, signingUrl])
+
+  // When signing is closed, return to reading pane
+  useEffect(() => {
+    if (isMobile && !signingUrl) {
+      setMobilePanel(prev => prev === 'signing' ? 'reading' : prev)
+    }
+  }, [isMobile, signingUrl])
 
   return (
     <div className="space-y-4">
@@ -40,38 +60,67 @@ export function Mailbox() {
         </div>
       </div>
 
-      {/* Three-panel mailbox */}
+      {/* Three-panel mailbox (single-panel on mobile) */}
       <div
         className="bg-surface border border-border rounded-xl overflow-hidden"
-        style={{ height: 'calc(100vh - var(--topbar-height) - 140px)', minHeight: 480 }}
+        style={{
+          height: isMobile
+            ? 'calc(100dvh - var(--topbar-height) - 100px)'
+            : 'calc(100vh - var(--topbar-height) - 140px)',
+          minHeight: isMobile ? 400 : 480,
+        }}
       >
         <div className="flex h-full">
+
           {/* Message list — left column */}
-          <div className="w-72 shrink-0 border-r border-border flex flex-col">
+          <div
+            className={[
+              'border-r border-border flex flex-col',
+              isMobile
+                ? (mobilePanel === 'list' ? 'flex-1' : 'hidden')
+                : 'w-72 shrink-0',
+            ].join(' ')}
+          >
             <div className="px-4 py-3 border-b border-border bg-surface-2">
               <h2 className="text-xs font-semibold text-secondary uppercase tracking-wide">Inbox</h2>
             </div>
             <div className="flex-1 overflow-y-auto">
-              <MessageList />
+              <MessageList
+                onSelect={isMobile ? () => setMobilePanel('reading') : undefined}
+              />
             </div>
           </div>
 
           {/* Reading pane — middle */}
           <div
             className={[
-              'flex flex-col border-r border-border overflow-hidden',
-              signingUrl ? 'flex-1' : 'flex-[2]',
+              'flex flex-col overflow-hidden',
+              // Only show border-r when signing panel is also visible (desktop)
+              !isMobile && signingUrl ? 'border-r border-border' : '',
+              isMobile
+                ? (mobilePanel === 'reading' ? 'flex-1' : 'hidden')
+                : (signingUrl ? 'flex-1' : 'flex-[2]'),
             ].join(' ')}
           >
-            <ReadingPane />
+            <ReadingPane
+              onMobileBack={isMobile ? () => setMobilePanel('list') : undefined}
+            />
           </div>
 
           {/* Signing panel — right */}
           {signingUrl && (
-            <div className="flex-[2] flex flex-col min-w-0 overflow-hidden">
+            <div
+              className={[
+                'flex flex-col min-w-0 overflow-hidden',
+                isMobile
+                  ? (mobilePanel === 'signing' ? 'flex-1' : 'hidden')
+                  : 'flex-[2]',
+              ].join(' ')}
+            >
               <SigningPanel />
             </div>
           )}
+
         </div>
       </div>
     </div>

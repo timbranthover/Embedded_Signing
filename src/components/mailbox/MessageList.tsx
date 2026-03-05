@@ -13,15 +13,25 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-export function MessageList() {
+interface MessageListProps {
+  /** Optional callback fired after selectItem — used by Mailbox to drive mobile panel navigation */
+  onSelect?: (id: string) => void
+}
+
+export function MessageList({ onSelect }: MessageListProps) {
   const { items, selectedId, selectItem } = useMailboxStore()
+
+  const handleClick = (id: string) => {
+    selectItem(id)
+    onSelect?.(id)
+  }
 
   return (
     <div className="flex flex-col overflow-y-auto h-full">
       {items.map(item => (
         <button
           key={item.id}
-          onClick={() => selectItem(item.id)}
+          onClick={() => handleClick(item.id)}
           className={[
             'w-full text-left px-4 py-3.5 border-b border-border transition-colors',
             'hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/40',
